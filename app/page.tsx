@@ -20,7 +20,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
-  const { user, login, logout } = useAuth();
+  const { user, login, logout, loading: authLoading } = useAuth();
   const [selectedTemplate, setSelectedTemplate] = useState(PROPOSAL_TEMPLATES[1].id);
 
   const proposalRef = useRef<HTMLDivElement>(null);
@@ -82,26 +82,48 @@ export default function Home() {
       alert('Failed to generate PDF.');
     }
   };
+  
 
-  const generateProposal = async () => {
-    setLoading(true);
-    setProposal("");
-    try {
-      const templateInstructions = PROPOSAL_TEMPLATES.find(t => t.id === selectedTemplate)?.prompt || "";
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ job, about, instruction: templateInstructions }),
-      });
-      const data = await res.json();
-      if (!proposal || !user) return toast.warning("Please sign in to save your history!");
-      else setProposal(data.proposal);
-    } catch (e) {
-      alert("Network error");
-    } finally {
-      setLoading(false);
+const generateProposal = async () => {
+  // 2. Prevent clicking while Firebase is still "waking up"
+  if (authLoading) return; 
+
+  // 3. Check for user BEFORE making the expensive API call
+  if (!user) {
+  toast.error("You must be logged in to generate a proposal!");
+  return;
+}
+
+  setLoading(true);
+  setProposal("");
+
+  try {
+    const templateInstructions = PROPOSAL_TEMPLATES.find(t => t.id === selectedTemplate)?.prompt || "";
+    
+    const res = await fetch("/api/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ job, about, instruction: templateInstructions }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      toast.error(data.error || "Generation failed");
+      return;
     }
-  };
+
+    // 4. Set the proposal directly from the data
+    setProposal(data.proposal);
+    toast.success("Magic generated!");
+
+  } catch (e) {
+    toast.error("Network error. Please check your connection.");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const saveProposal = async () => {
     if (!proposal || !user) return toast.warning("Please sign in to save your history!");
