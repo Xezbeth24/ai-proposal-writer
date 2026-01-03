@@ -1,11 +1,26 @@
 "use client";
+
 import { createContext, useContext, useEffect, useState } from "react";
-import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut } from "firebase/auth";
+import { 
+  signInWithRedirect, 
+  getRedirectResult, 
+  GoogleAuthProvider,
+  signOut,
+  onAuthStateChanged,
+  User 
+} from "firebase/auth";
 import { auth } from "@/firebase";
 
-// 1. Define everything the context will provide
-const AuthContext = createContext({ 
-  user: null as User | null, 
+// Define the context type
+interface AuthContextType {
+  user: User | null;
+  loading: boolean;
+  login: () => Promise<void>;
+  logout: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType>({
+  user: null,
   loading: true,
   login: async () => {},
   logout: async () => {}
@@ -15,16 +30,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // 2. Define the login/logout logic here so it's shared everywhere
+  // Fixed login function
   const login = async () => {
-    const provider = new GoogleAuthProvider();
     try {
-      await signInWithPopup(auth, provider);
+      const provider = new GoogleAuthProvider();
+      await signInWithRedirect(auth, provider);
     } catch (error) {
       console.error("Login failed:", error);
     }
   };
 
+  // Logout function
   const logout = async () => {
     try {
       await signOut(auth);
@@ -33,11 +49,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  // Fixed useEffect with BOTH redirect handling AND auth state listener
   useEffect(() => {
+    // 1. Handle redirect result (for mobile login)
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          setUser(result.user);
+        }
+      })
+      .catch((error) => {
+        console.error("Redirect error:", error);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+
+    // 2. Listen for auth state changes (for normal logins and keeping user logged in)
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       setLoading(false);
     });
+
     return () => unsubscribe();
   }, []);
 
