@@ -11,7 +11,6 @@ import {
 } from "firebase/auth";
 import { auth } from "@/firebase";
 
-// Define the context type
 interface AuthContextType {
   user: User | null;
   loading: boolean;
@@ -30,54 +29,52 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Fixed login function
   const login = async () => {
+    console.log("🚀 Login clicked!");
     try {
       const provider = new GoogleAuthProvider();
       await signInWithRedirect(auth, provider);
     } catch (error) {
-      console.error("Login failed:", error);
+      console.error("❌ Login failed:", error);
     }
   };
 
-  // Logout function
   const logout = async () => {
     try {
       await signOut(auth);
     } catch (error) {
-      console.error("Logout failed:", error);
+      console.error("❌ Logout failed:", error);
     }
   };
 
-  // Fixed useEffect with BOTH redirect handling AND auth state listener
   useEffect(() => {
-  console.log("🔍 Checking redirect result...");
-  
-  getRedirectResult(auth)
-    .then((result) => {
-      console.log("📱 Redirect result:", result);
+    console.log("🔍 AuthProvider mounted");
+
+    // 1. Handle redirect FIRST (critical order!)
+    getRedirectResult(auth).then((result) => {
+      console.log("📱 getRedirectResult:", result);
       if (result?.user) {
-        console.log("✅ User from redirect:", result.user.email);
+        console.log("✅ Redirect login success:", result.user.email);
         setUser(result.user);
-      } else {
-        console.log("❌ No redirect user");
       }
-    })
-    .catch((error) => {
+    }).catch((error) => {
       console.error("❌ Redirect error:", error);
-    })
-    .finally(() => {
-      setLoading(false);
     });
 
-
-    // 2. Listen for auth state changes (for normal logins and keeping user logged in)
+    // 2. Listen for ALL future auth changes (AFTER redirect handled)
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      console.log("👤 onAuthStateChanged:", user?.email || "null");
       setUser(user);
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    // 3. Initial load complete
+    setTimeout(() => setLoading(false), 1000);
+
+    return () => {
+      console.log("🧹 AuthProvider cleanup");
+      unsubscribe();
+    };
   }, []);
 
   return (
