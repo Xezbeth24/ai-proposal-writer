@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "../components/ui/providers/AuthProvider";
 import { Toaster } from 'sonner';
+import { Analytics } from "@vercel/analytics/react"; // Component imported
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,8 +32,9 @@ export default function RootLayout({
       >
         <AuthProvider> 
           {children} 
-          {/* 1. This adds the notification popups to your app */}
           <Toaster position="top-center" richColors />
+          {/* Vercel Analytics added below */}
+          <Analytics /> 
         </AuthProvider>
       </body>
     </html>
