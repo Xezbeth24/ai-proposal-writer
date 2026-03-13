@@ -16,27 +16,20 @@ pipeline {
             }
         }
         
-        stage('Install Node.js') {
-            steps {
-                echo "📑 Installing Node.js and npm..."
-                sh '''
-                    if ! command -v npm &> /dev/null; then
-                        echo "Installing Node.js via apt..."
-                        apt-get update
-                        apt-get install -y curl gnupg2 lsb-release ca-certificates
-                        curl -fsSL https://deb.nodesource.com/setup_18.x | bash - || true
-                        apt-get install -y nodejs || (curl -L https://nodejs.org/dist/latest-v18.x/node-v18.17.0-linux-x64.tar.xz | tar xJ -C /usr/local --strip-components=1) || true
-                    fi
-                    node --version
-                    npm --version
-                '''
-            }
-        }
-        
         stage('Install Dependencies') {
             steps {
                 echo "📦 Installing Node.js dependencies..."
-                sh 'npm install --legacy-peer-deps || npm install'
+                // Try npm install with fallbacks
+                sh '''
+                    if command -v npm &> /dev/null; then
+                        npm install --legacy-peer-deps || npm install
+                    else
+                        echo "WARNING: npm not found in Jenkins agent"
+                        echo "This pipeline requires Node.js and npm to be installed in the Jenkins container."
+                        echo "Please install Node.js 18+ in the Jenkins Docker container and rebuild the image."
+                        exit 1
+                    fi
+                '''
             }
         }
         
@@ -106,11 +99,12 @@ pipeline {
     
     post {
         success {
-            echo "✅ Pipeline completed successfully!"
-            echo "🎉 Application is deployed"
+            echo "✅ Pipeline executed!"
+            echo "🌟 Check console for detailed information."
         }
         failure {
-            echo "❌ Pipeline had some issues. Check logs above."
+            echo "❌ Pipeline encountered an issue - likely due to missing Node.js in Jenkins."
+            echo "SOLUTION: Install Node.js 18+ in the Jenkins Docker container."
         }
         always {
             echo "🧹 Cleaning up workspace..."
